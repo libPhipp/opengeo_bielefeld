@@ -1,0 +1,65 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+# Wohnlagen in Bielefeld
+
+Datenbasis für den Code Sprint sind die städtischen Daten zur Wohnlagenkarte [1] aus dem open-data Portal der Stadt Bielefeld. Weitere Teile der Stadt werden von diesem Datensatz durch bewertete Polygone überdeckt.
+
+Mögliche Richtungen des Code Sprints:
+t.b.d
+
+```{r message = FALSE}
+library(sf)
+library(ggplot2)
+library(ggmap)
+```
+
+##Die Definition der Wohnlage ist mit den Kennzahlen von 1 bis 4 angegeben.
+
+###1: Einfache Wohnlage
+Als einfache Wohnlagen gelten Wohngebiete mit nachteilig wirkendem Charakter, z. B. durch die Lage an stark frequentierten Verkehrswegen, ein negatives Image als sozialer Brennpunkt und unzureichende Versorgungsinfrastruktur und/oder ihre Nähe zu größeren Gewerbe- und Industriegebieten
+
+###2: Normale Wohnlage
+Der überwiegende Teil des Stadtgebietes wird durch die normale Wohnlage ohne besondere Vor- und Nachteile geprägt. Durchschnittliche Immissionsbelastungen kennzeichnen diese Gebiete. Grundstücke mit genügend Freiflächen sind charakteristisch für normale Wohnlagen, die den Nachteil der durchschnittlichen Immissionsbelastung wieder ausgleichen.
+
+###3: Gute Wohnlage
+Gute Wohnlagen befinden sich meist in einem weitgehend abgeschlossenen, durchgrünten Wohngebiet mit aufgelockerter Bebauung, verkehrsgünstig gelegen und in der Nähe von Erholungsflächen, positives Image. Stark nachgefragte innerstädtische Wohnquartiere (Urbanes Wohnen) fallen ebenfalls in diese Kategorie.
+
+###4: Sehr gute/bevorzugte Wohnlage
+Besonders imageträchtige und stark nachgefragte Innenstadtrandlagen. Sehr gute Wohnlagen weisen in der Regel alle Vorteile der guten Wohnlage auf, verfügen darüber hinaus noch über mindestens eine weiteren herausragenden Nutzungsvorteil wie Topograhie oder eine besonders schöne Landschaft, Nachbarschaft und Umgebung. Sehr gute/bevorzugte Wohnlagen sind oft geprägt durch luxuriöse Bebauung mit großzügigen Außenanlagen und großen Abständen zur Nachbarbebauung. In diese Kategorie fallen auch Stadthäuser, häufig aus der Gründerzeit. 
+
+```{r cache=TRUE}
+wk <- st_read("wohnlagenkarte.gml")
+ggplot(wk) + geom_sf(data = wk, aes(fill = lagequalit)) +
+  ggtitle("Wohnlagenkarte von Bielefeld") +
+  theme_bw()
+
+#plot(wk)
+```
+
+Wir bekommen auch die offiziellen Stadtbezirksgrenzen gemäßg amtlichem Liegenschaftkataster:
+
+```{r cache=TRUE}
+bzrk <- st_read("stadtbezirke/result.gml")
+ggplot(bzrk) + geom_sf(data = bzrk) +
+  ggtitle("Stadtbezirksgrenzen von Bielefeld") +
+  theme_bw()
+
+```
+
+Kombiniert man diese beiden Datensätze, dann ergibt sich folgendes Bild der Wohlagenkarte:
+```{r cache=TRUE}
+ggplot(bzrk) + geom_sf(data = bzrk) +
+  geom_sf(data = wk, aes(fill = lagequalit)) +
+  ggtitle("Wohnlagenkarte von Bielefeld") +
+  theme_bw()
+
+```
+
+
+##Quellen:
+
+[1] Die Ausgangsdaten basieren auf der Wohnlagenkarte der Stadt Bielefeld, abgerufen von https://open-data.bielefeld.de/dataset/wohnlagenkarte, am 21.4.18. © Stadt Bielefeld, Amt für Geoinformation und Kataster (CC BY 4.0)
+
