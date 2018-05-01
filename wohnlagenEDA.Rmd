@@ -1,22 +1,27 @@
 ---
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 # Wohnlagen in Bielefeld
 
-Datenbasis für den Code Sprint sind die städtischen Daten zur Wohnlagenkarte [1] aus dem open-data Portal der Stadt Bielefeld. Weitere Teile der Stadt werden von diesem Datensatz durch bewertete Polygone überdeckt.
+Datenbasis für den Code Sprint sind die städtischen Daten zur Wohnlagenkarte [1] aus dem open-data Portal der Stadt Bielefeld. Weitere Teile der Stadt, die ausgezeichneten Wohnflächen, werden von diesem Datensatz durch bewertete Polygone überdeckt.
 
-Mögliche Richtungen des Code Sprints:
-t.b.d
 
 ```{r message = FALSE}
 library(sf)
 library(ggplot2)
 library(ggmap)
+library(magrittr)
+library(dplyr)
+library(tidyr)
+library(units)
+library(ggridges)
 ```
 
-##Die Definition der Wohnlage ist mit den Kennzahlen von 1 bis 4 angegeben.
+## Die Bewertung im Ausgangsdatensatz
+
+Die Definition der Wohnlage ist mit den Kennzahlen von 1 bis 4 angegeben. Die Stadt Bielefeld schreibt dazu in [1]:
 
 ###1: Einfache Wohnlage
 Als einfache Wohnlagen gelten Wohngebiete mit nachteilig wirkendem Charakter, z. B. durch die Lage an stark frequentierten Verkehrswegen, ein negatives Image als sozialer Brennpunkt und unzureichende Versorgungsinfrastruktur und/oder ihre Nähe zu größeren Gewerbe- und Industriegebieten
@@ -30,13 +35,16 @@ Gute Wohnlagen befinden sich meist in einem weitgehend abgeschlossenen, durchgr�
 ###4: Sehr gute/bevorzugte Wohnlage
 Besonders imageträchtige und stark nachgefragte Innenstadtrandlagen. Sehr gute Wohnlagen weisen in der Regel alle Vorteile der guten Wohnlage auf, verfügen darüber hinaus noch über mindestens eine weiteren herausragenden Nutzungsvorteil wie Topograhie oder eine besonders schöne Landschaft, Nachbarschaft und Umgebung. Sehr gute/bevorzugte Wohnlagen sind oft geprägt durch luxuriöse Bebauung mit großzügigen Außenanlagen und großen Abständen zur Nachbarbebauung. In diese Kategorie fallen auch Stadthäuser, häufig aus der Gründerzeit. 
 
+## Laden der Daten und ein erster Blick
+
+Recht puristisch ist der erste interessante Einblick auf die Daten. Es handelt sich um 809 bewertete Polygone, der Koordinaten im Koordinatenbezugssystem EPSG25832 gegeben sind:
+
 ```{r cache=TRUE}
 wk <- st_read("wohnlagenkarte.gml")
 ggplot(wk) + geom_sf(data = wk, aes(fill = lagequalit)) +
   ggtitle("Wohnlagenkarte von Bielefeld") +
   theme_bw()
 
-#plot(wk)
 ```
 
 Wir bekommen auch die offiziellen Stadtbezirksgrenzen gemäßg amtlichem Liegenschaftkataster:
@@ -58,6 +66,143 @@ ggplot(bzrk) + geom_sf(data = bzrk) +
 
 ```
 
+Zum Import von Kartenmaterial lässt sich das Paket ggmap nutzen:
+
+```{r cache=TRUE, message=FALSE}
+bbox <- bzrk %>% st_transform(4326) %>% st_bbox
+mapImageData <- get_googlemap(center = c(lon = median(bbox[c(1,3)]), 
+                              lat = median(bbox[c(2,4)])), zoom = 10,
+                              size = c(500, 500),
+                              maptype = c("satellite")) 
+# Benenne die Stadtteile
+bzrk$name <- ''
+bzrk$name[1] <- 'Brackwede'
+bzrk$name[2] <- 'Dornberg'
+bzrk$name[3] <- 'Jöllenbeck'
+bzrk$name[4] <- 'Heepen'
+bzrk$name[5] <- 'Stieghorst'
+bzrk$name[6] <- 'Sennestadt'
+bzrk$name[7] <- 'Senne'
+bzrk$name[8] <- 'Gadderbaum'
+bzrk$name[9] <- 'Schildesche'
+bzrk$name[10] <- 'Mitte'
+
+bzrk %>% select(name,msGeometry) %>% st_transform(crs = 3857) %>%  plot(main = "Stadtbezirke", bgMap = mapImageData)
+```
+
+```{r cache=TRUE, message = FALSE}
+
+bg_google <- ggmap(mapImageData)
+
+#googlemaps uses egps3857?
+bzrk2 <- bzrk %>% st_transform(4326)
+wk2 <- wk %>% st_transform(4326)
+#nc_map = get_map(location = unname(st_bbox(bzrk)))
+
+ggmap(mapImageData) + geom_sf(data = bzrk2, inherit.aes = FALSE, aes(alpha = 0.8)) +
+  geom_sf(data = wk2, aes(fill = lagequalit), inherit.aes = FALSE) +
+  ggtitle("Wohnlagenkarte von Bielefeld") +
+  theme_bw()
+
+```
+## Wohnlagenbewertung abfragen
+
+Finde die Wohnlagenbewertung zu einer Adresse:
+
+```{r cache=TRUE}
+
+
+#besorge die Koordinaten eines PoI:
+pt <- ggmap::geocode('Rolandstraße 16, Bielefeld', source = 'google')
+# Alternative DataScienceToolkit:
+#ggmap::geocode('Stapenhorststraße 100, Bielefeld', source = 'dsk')
+
+# Erzeuge ein sf-Objekt, mit crs 4326
+p <- pt %>% st_as_sf(coords = c("lon", "lat"), crs = 4326)
+
+# Angleichen der Koordinatenreferenzsysteme
+p %<>% st_transform(crs = st_crs(wk))
+
+# Ausgeben der Lagequalität
+st_join(p, wk)$lagequalit
+
+# Visuelle Überprüfung, ob die Koordinatentransformation richtig war:
+ggplot(bzrk) + geom_sf(data = bzrk) +
+  geom_sf(data = st_join(p, wk)) +
+  ggtitle("Stadtbezirksgrenzen von Bielefeld") +
+  theme_bw()
+
+# 2. visuelle Überprüfung anhand von Satellitenbild
+localImageData <- get_googlemap(center = c(lon = pt$lon, 
+                              lat = pt$lat), zoom = 10,
+                              size = c(500, 500),
+                              source = "osm",
+                              maptype = c("satellite")) 
+
+p %>% st_transform(crs = 3857) %>%  plot(bgMap = localImageData)
+
+```
+
+
+## Qualität der Wohngebiete je Stadtbezirk:
+
+Welchen Anzeil der Wohnfläche eines Stadtbezirks belegen die Wohnlagen der jeweiligen Qualität? Die unten stehende Tabelle ist so zu lesen, dass in Dornberg keine Wohnfläche mit Wohnqualität 1 vorhanden sind und 50% der Wohnfläche von Qualität 3 sind:
+```{r}
+# Bringe beide Variablen in das gleich Bezugssystem:
+wk2 <- wk %>% st_transform(crs = st_crs(bzrk)) %>%
+       mutate(area = st_area(msGeometry))
+
+#Hinzufügen einer Flächen-Spalte
+bzrk %<>% mutate(area = st_area(msGeometry))
+
+#Berechnung der Wohnfläche je Bezirk
+temp <- st_join(wk2, bzrk) %>% st_buffer(0) %>% group_by(name) %>% summarise(warea = sum(area.x)) %>% as.data.frame()
+lf_warea <- function(bname){
+  return(filter(temp,name == bname) %>% select(warea) %>% pull())
+}
+# Vectorize zerstört noch die Einheit m^2, daher wird diese anschließend
+# wieder gesetzt.
+lvf_warea <- Vectorize(lf_warea)
+bzrk %<>% mutate(warea = set_units(lvf_warea(name),"m^2"))
+
+
+#Übersicht über die Wohngebiete nach Lagequalität je Stadtbezirk
+#Die Spalte prop zeigt den Anzeil der Wohnfläche der jeweiligen Lagequalität an der Gesamtfläche des Bezirks:
+summary <- bzrk %>% #filter(name == 'Dornberg') %>% 
+  st_join(wk2) %>% 
+  group_by(name, lagequalit) %>% summarise(n = n(), area = sum(area.y), warea = mean(warea), prop = sum(area.y) / mean(warea) ) %>%
+  as.data.frame() %>% select(name, lagequalit, n, area, warea, prop) 
+
+summary %>% select(name, lagequalit, prop) %>% spread(lagequalit, prop)
+```
+
+Grafisch aufbereitet ergibt sich folgendes Bild:
+
+```{r}
+
+summary %>% mutate(area = as.numeric(area), prop = as.numeric(prop)) %>%
+ggplot(aes(x = area, y = lagequalit)) + geom_point(aes(size = prop, color = name)) + 
+  labs(x = "Fläche in m^2", y = "Lagequalität")
+```
+
+Eine visuell leichter zugängliche Darstellung dieser Zahlen ergibt sich vielleicht in einem grideplot:
+
+```{r}
+
+
+summary %>% mutate(lagequalit = as.numeric(lagequalit), prop = as.numeric(prop)) %>%
+ggplot(aes(x = lagequalit, y = name, height = prop, fill = name)) + geom_density_ridges(stat = "identity", scale = 1) +
+    theme_minimal() + scale_fill_cyclical(values = c("#41f4cd", "#4286f4")) +
+    labs(x = "Lagequalität (Anteil)", y = "Stadtbezirk")
+
+```
+
+Was macht eine hohe Lagequalität aus? Erkennt man Auffälligkeiten an der Größe der Gebiete? Gibt es interessante Ausreißer? Tatsächlich finden sich in den Bewertungsgruppen 2,3 und 4 Ausreißer, die sicher einen genaueren Blick wert sind.
+
+```{r cache=TRUE}
+st_join(wk2, bzrk) %>% mutate(area = as.numeric(area.x)) %>% select(area, lagequalit, name) %>% ggplot(aes(x = area, y = lagequalit)) + geom_point(aes(color = name)) + labs(x = "Fläche in m^2", y = "Lagequalität")
+
+```
 
 ##Quellen:
 
