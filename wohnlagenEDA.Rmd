@@ -1,7 +1,7 @@
 ---
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 # Wohnlagen in Bielefeld
 
@@ -185,7 +185,7 @@ ggplot(aes(x = area, y = lagequalit)) + geom_point(aes(size = prop, color = name
   labs(x = "Fläche in m^2", y = "Lagequalität")
 ```
 
-Eine visuell leichter zugängliche Darstellung dieser Zahlen ergibt sich vielleicht in einem grideplot:
+Eine visuell leichter zugängliche Darstellung dieser Zahlen ergibt sich vielleicht in einem ridgeplot:
 
 ```{r}
 
