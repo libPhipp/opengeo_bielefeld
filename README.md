@@ -4,7 +4,7 @@ Dieses Repository beinhaltet R-Skripte deren Inhalt eine Analyse der Datenlage z
 
 In der Gruppe datascience-bielefeld.de beabsichtigen wir in den kommenden Meet Ups eine Anreicherung dieser Bewertung durch andere  öffentliche Datenquelle vorzunehmen. Pull Requests mit interessanten Ideen zur Anreicherung sind ebenso willkommen wie eine angeregte Diskussion der Möglichkeiten in den "Issues".
 
-![Verteilung der Wohnqualität innerhalb der Stadtberzirke](opengeo_bielefeld/wohnlagenEDA_files/figure-html/unnamed-chunk-10-1.png) 
+![Verteilung der Wohnqualität innerhalb der Stadtberzirke](/wohnlagenEDA_files/figure-html/unnamed-chunk-10-1.png) 
 
 <hr/>
 
